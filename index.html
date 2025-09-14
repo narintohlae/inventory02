@@ -160,37 +160,47 @@
                     <p>ไม่พบข้อมูล</p>
                 </div>
             </div>
+
+            <div id="pagination-controls" class="hidden flex justify-between items-center mt-4 px-4 py-2 bg-white rounded-lg shadow-md">
+                <button id="prev-page-btn" class="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed">
+                    ก่อนหน้า
+                </button>
+                <span id="page-info" class="text-sm font-semibold text-gray-700"></span>
+                <button id="next-page-btn" class="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed">
+                    ถัดไป
+                </button>
+            </div>
         </div>
 
         <div id="requisition-view" class="hidden">
-                       <div class="bg-white rounded-lg shadow-md p-4 sm:p-6">
-                               <div class="flex justify-between items-center mb-4">
-                                      <h2 class="text-2xl font-bold text-gray-700">รายการเบิกของ</h2>
-                                      <div class="flex items-center gap-2">
-                                          <button id="auto-requisition-btn" class="bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded-md transition duration-300">
-                                              เบิกของอัตโนมัติ
-                                          </button>
-                                          <button id="confirm-requisition-btn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-md transition duration-300 disabled:bg-gray-400">
-                                              ยืนยัน
-                                          </button>
-                                      </div>
-                               </div>
-                               <div class="overflow-x-auto">
-                                   <table class="w-full min-w-full divide-y divide-gray-200 show-grid">
-                                       <thead class="bg-gray-200">
-                                           <tr>
-                                               <th scope="col" class="py-3 px-2 text-center text-xs font-medium text-gray-600 uppercase tracking-wider w-8">ลำดับ</th>
-                                               <th scope="col" class="py-3 px-2 text-left text-xs font-medium text-gray-600 uppercase tracking-wider w-auto">สินค้า</th>
-                                               <th scope="col" class="py-3 px-2 text-center text-xs font-medium text-gray-600 uppercase tracking-wider w-14">จำนวนเบิก</th>
-                                               <th scope="col" class="py-3 px-2 text-center text-xs font-medium text-gray-600 uppercase tracking-wider w-14">หน่วย</th>
-                                               <th scope="col" class="py-3 px-2 text-center text-xs font-medium text-gray-600 uppercase tracking-wider w-12">จัดการ</th>
-                                           </tr>
-                                       </thead>
-                                       <tbody id="requisition-list-body" class="bg-white divide-y divide-gray-200">
-                                       </tbody>
-                                   </table>
-                               </div>
-                          </div>
+           <div class="bg-white rounded-lg shadow-md p-4 sm:p-6">
+               <div class="flex justify-between items-center mb-4">
+                  <h2 class="text-2xl font-bold text-gray-700">รายการเบิกของ</h2>
+                  <div class="flex items-center gap-2">
+                      <button id="auto-requisition-btn" class="bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded-md transition duration-300">
+                          เบิกของอัตโนมัติ
+                      </button>
+                      <button id="confirm-requisition-btn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-md transition duration-300 disabled:bg-gray-400">
+                          ยืนยัน
+                      </button>
+                  </div>
+               </div>
+               <div class="overflow-x-auto">
+                   <table class="w-full min-w-full divide-y divide-gray-200 show-grid">
+                       <thead class="bg-gray-200">
+                           <tr>
+                               <th scope="col" class="py-3 px-2 text-center text-xs font-medium text-gray-600 uppercase tracking-wider w-8">ลำดับ</th>
+                               <th scope="col" class="py-3 px-2 text-left text-xs font-medium text-gray-600 uppercase tracking-wider w-auto">สินค้า</th>
+                               <th scope="col" class="py-3 px-2 text-center text-xs font-medium text-gray-600 uppercase tracking-wider w-14">จำนวนเบิก</th>
+                               <th scope="col" class="py-3 px-2 text-center text-xs font-medium text-gray-600 uppercase tracking-wider w-14">หน่วย</th>
+                               <th scope="col" class="py-3 px-2 text-center text-xs font-medium text-gray-600 uppercase tracking-wider w-12">จัดการ</th>
+                           </tr>
+                       </thead>
+                       <tbody id="requisition-list-body" class="bg-white divide-y divide-gray-200">
+                       </tbody>
+                   </table>
+               </div>
+          </div>
         </div>
 
          <div id="history-view" class="hidden">
@@ -517,6 +527,10 @@
         const contextMenuSettingsBtn = document.getElementById('context-menu-settings');
         const contextMenuHideBtn = document.getElementById('context-menu-hide');
         const contextMenuAddHeaderBtn = document.getElementById('context-menu-add-header');
+        const paginationControls = document.getElementById('pagination-controls');
+        const prevPageBtn = document.getElementById('prev-page-btn');
+        const nextPageBtn = document.getElementById('next-page-btn');
+        const pageInfo = document.getElementById('page-info');
         
         let allRecords = [], currentRecords = [], categories = [], sortOrdersMap = {}, categoryOrder = [], requisitionList = [], historyList = [];
         let customRows = new Map(), itemSettings = new Map(), hiddenItemsMap = {};
@@ -530,9 +544,12 @@
         let categoriesCollectionRef, hiddenItemsDocRef, sortOrdersDocRef, customRowsCollectionRef, categoryOrderDocRef, itemSettingsCollectionRef, requisitionListCollectionRef, requisitionHistoryCollectionRef, countersDocRef, appSettingsDocRef;
         let unsubscribes = [];
         let lastGoodCellIndex = 0; 
+        
+        // --- Pagination State ---
+        let currentPage = 1;
+        const itemsPerPage = 25;
 
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        // For Firebase JS SDK v7.20.0 and later, measurementId is optional
         const firebaseConfig = {
           apiKey: "AIzaSyAqMV6X0Tfs-JwZ4AY_RJELr55pFJslvpU",
           authDomain: "the-byway-468900-b7.firebaseapp.com",
@@ -672,9 +689,14 @@
                 categoryBtn.classList.toggle('hover:text-gray-700', activeCategoryName !== category.name);
                 categoryBtn.textContent = category.name;
                 categoryBtn.addEventListener('click', () => {
+                    currentPage = 1; // Reset to page 1 when category changes
                     let filteredRecords;
-                    if (category.name === 'อื่นๆ') { const otherCategoryNames = categories.filter(c => c.name !== 'อื่นๆ').map(c => c.name.toLowerCase()); filteredRecords = allRecords.filter(record => !otherCategoryNames.some(catName => (record[itemColumnName]?.toLowerCase() || '').includes(catName))); } 
-                    else { filteredRecords = allRecords.filter(r => r[itemColumnName]?.toLowerCase().includes(category.name.toLowerCase())); }
+                    if (category.name === 'อื่นๆ') { 
+                        const otherCategoryNames = categories.filter(c => c.name !== 'อื่นๆ').map(c => c.name.toLowerCase()); 
+                        filteredRecords = allRecords.filter(record => !otherCategoryNames.some(catName => (record[itemColumnName]?.toLowerCase() || '').includes(catName))); 
+                    } else { 
+                        filteredRecords = allRecords.filter(r => r[itemColumnName]?.toLowerCase().includes(category.name.toLowerCase())); 
+                    }
                     noDataEl.querySelector('p').textContent = `ไม่พบสินค้าในหมวดหมู่ "${category.name}"`;
                     activeCategoryName = category.name;
                     displayData(filteredRecords);
@@ -691,18 +713,8 @@
                 const nameSpan = document.createElement('span');
                 nameSpan.textContent = category.name;
                 nameSpan.className = 'focus:outline-none';
-
-                // Desktop: right-click
-                categoryEl.addEventListener('contextmenu', (e) => {
-                    e.preventDefault();
-                    openCategoryActionsModal(category);
-                });
-
-                // Mobile: double-click
-                categoryEl.addEventListener('dblclick', () => {
-                    openCategoryActionsModal(category);
-                });
-
+                categoryEl.addEventListener('contextmenu', (e) => { e.preventDefault(); openCategoryActionsModal(category); });
+                categoryEl.addEventListener('dblclick', () => { openCategoryActionsModal(category); });
                 categoryEl.appendChild(nameSpan);
                 manageCategoryList.appendChild(categoryEl);
             });
@@ -726,22 +738,53 @@
             } catch (error) { showError(error.message); } 
             finally { loadingEl.classList.add('hidden'); } 
         }
+
+        function updatePaginationControls(totalItems, totalPages) {
+            if (activeCategoryName === 'อื่นๆ' && totalPages > 1) {
+                pageInfo.textContent = `หน้า ${currentPage} / ${totalPages}`;
+                prevPageBtn.disabled = currentPage === 1;
+                nextPageBtn.disabled = currentPage === totalPages;
+                paginationControls.classList.remove('hidden');
+                paginationControls.classList.add('flex');
+            } else {
+                paginationControls.classList.add('hidden');
+                paginationControls.classList.remove('flex');
+            }
+        }
         
         function displayData(records) {
             currentRecords = records;
             tableHead.innerHTML = '';
             tableBody.innerHTML = '';
             if (sortableInstance) sortableInstance.destroy();
+            
             const allRecordsMap = new Map(allRecords.map(r => [r[itemColumnName], r]));
             const currentRecordIds = new Set(records.map(r => r[itemColumnName]));
             const sortKey = activeCategoryName || '__global__';
             const hiddenIdsForCurrentCategory = hiddenItemsMap[sortKey] || new Set();
             const currentItemOrder = sortOrdersMap[sortKey] || [];
             const combinedOrder = [...new Set([...currentItemOrder, ...records.map(r => r[itemColumnName])])];
-            const displayOrder = combinedOrder.filter(id => customRows.has(id) || currentRecordIds.has(id));
+            
+            let displayOrder = combinedOrder.filter(id => customRows.has(id) || currentRecordIds.has(id));
+
+            // --- PAGINATION LOGIC ---
+            if (activeCategoryName === 'อื่นๆ') {
+                const totalItems = displayOrder.length;
+                const totalPages = Math.ceil(totalItems / itemsPerPage);
+                updatePaginationControls(totalItems, totalPages);
+                
+                if (totalPages > 1) {
+                    const startIndex = (currentPage - 1) * itemsPerPage;
+                    displayOrder = displayOrder.slice(startIndex, startIndex + itemsPerPage);
+                }
+            } else {
+                paginationControls.classList.add('hidden');
+            }
+            // --- END PAGINATION LOGIC ---
+
             const visibleIds = new Set(displayOrder.filter(id => !hiddenIdsForCurrentCategory.has(id)));
 
-            if (visibleIds.size === 0) {
+            if (records.length === 0 || visibleIds.size === 0) {
                 tableEl.classList.add('hidden');
                 noDataEl.classList.remove('hidden');
                 return;
@@ -763,35 +806,6 @@
                 const headerText = document.createElement('span');
                 headerText.textContent = header.replace(/_/g, ' ');
                 headerContentWrapper.appendChild(headerText);
-
-                if (header === itemColumnName) {
-                    th.id = 'product-header-cell';
-
-                    if (activeCategoryName === 'อื่นๆ') {
-                        const searchInput = document.createElement('input');
-                        searchInput.type = 'text';
-                        searchInput.id = 'product-search-input';
-                        searchInput.placeholder = 'ค้นหาสินค้า...';
-                        searchInput.className = 'ml-4 p-1 border border-gray-300 rounded-md text-sm font-normal normal-case';
-                        searchInput.addEventListener('keyup', () => {
-                            const filter = searchInput.value.toLowerCase();
-                            const rows = tableBody.getElementsByTagName('tr');
-                            for (let i = 0; i < rows.length; i++) {
-                                const cell = rows[i].getElementsByTagName('td')[0];
-                                if (cell) {
-                                    const txtValue = cell.textContent || cell.innerText;
-                                    if (txtValue.toLowerCase().indexOf(filter) > -1) {
-                                        rows[i].style.display = '';
-                                    } else {
-                                        rows[i].style.display = 'none';
-                                    }
-                                }
-                            }
-                        });
-                        headerContentWrapper.appendChild(searchInput);
-                    }
-                }
-
                 th.appendChild(headerContentWrapper);
                 headerRow.appendChild(th);
             });
@@ -799,7 +813,6 @@
 
             displayOrder.forEach(id => { 
                 if (!visibleIds.has(id)) return; 
-                
                 const row = document.createElement('tr');
                 row.dataset.id = id;
 
@@ -813,7 +826,7 @@
                         cell.textContent = rowData.text; 
                         cell.setAttribute('tabindex', '-1');
                         row.addEventListener('contextmenu', (e) => { e.preventDefault(); openHeaderActionsModal(id, rowData.text); });
-                        row.addEventListener('dblclick', () => { openHeaderActionsModal(id, rowData.text); }); // Added for mobile
+                        row.addEventListener('dblclick', () => { openHeaderActionsModal(id, rowData.text); });
                         row.appendChild(cell); 
                         tableBody.appendChild(row); 
                     } 
@@ -821,7 +834,7 @@
                     const record = allRecordsMap.get(id); 
                     row.className = 'hover:bg-gray-50';
                     row.addEventListener('contextmenu', (e) => { e.preventDefault(); openContextMenu(e, record); });
-                    row.addEventListener('dblclick', (e) => { openContextMenu(e, record); }); // Added for mobile
+                    row.addEventListener('dblclick', (e) => { openContextMenu(e, record); });
 
                     headers.forEach(header => { 
                         const td = document.createElement('td'); 
@@ -858,7 +871,6 @@
                     }
                 }
             }
-
             sortableInstance = new Sortable(tableBody, { animation: 150, ghostClass: 'sortable-ghost', chosenClass: 'sortable-chosen', delay: 200, touchStartThreshold: 5, onEnd: (evt) => { const newOrder = Array.from(tableBody.querySelectorAll('tr')).map(row => row.dataset.id); saveCurrentSortOrder(newOrder); } }); 
         }
         
@@ -876,9 +888,7 @@
                 const date = historyItem.timestamp.toDate(); const formattedDate = `${date.toLocaleDateString('th-TH')} ${date.toLocaleTimeString('th-TH')}`; 
                 const card = document.createElement('div'); card.className = 'bg-gray-50 rounded-lg p-4 shadow'; 
                 const tableRows = historyItem.items.map((item, index) => `<tr><td class="py-2 px-2 text-sm text-gray-600 text-center">${index + 1}</td><td class="py-2 px-2 text-sm text-gray-800 break-words">${item.name}</td><td class="py-2 px-2 text-sm text-gray-800 text-center">${item.quantity}</td><td class="py-2 px-2 text-sm text-gray-600 text-center">${item.unit}</td></tr>`).join(''); 
-                
                 card.innerHTML = `<div class="flex justify-between items-center mb-3"><h3 class="font-semibold text-gray-800">${historyItem.requisitionNumber}</h3><span class="text-sm text-gray-500">${formattedDate}</span></div><div class="overflow-x-auto"><table class="w-full table-auto show-grid"><thead><tr><th scope="col" class="py-2 px-2 bg-gray-200 text-xs text-gray-600 font-medium text-center">ลำดับ</th><th scope="col" class="py-2 px-2 bg-gray-200 text-xs text-gray-600 font-medium text-left">สินค้า</th><th scope="col" class="py-2 px-2 bg-gray-200 text-xs text-gray-600 font-medium text-center">จำนวน</th><th scope="col" class="py-2 px-2 bg-gray-200 text-xs text-gray-600 font-medium text-center">หน่วย</th></tr></thead><tbody class="divide-y divide-gray-200">${tableRows}</tbody></table></div>`; 
-
                 historyListContainer.appendChild(card); 
             });
         }
@@ -886,27 +896,15 @@
         function openContextMenu(event, record) {
             contextMenuItemRecord = record;
             const { clientX: mouseX, clientY: mouseY } = event;
-            
             itemContextMenu.style.top = `${mouseY}px`;
             itemContextMenu.style.left = `${mouseX}px`;
             itemContextMenu.classList.remove('hidden');
-
             const menuRect = itemContextMenu.getBoundingClientRect();
-            if (menuRect.bottom > window.innerHeight) {
-                itemContextMenu.style.top = `${mouseY - menuRect.height}px`;
-            }
-            if (menuRect.right > window.innerWidth) {
-                itemContextMenu.style.left = `${mouseX - menuRect.width}px`;
-            }
+            if (menuRect.bottom > window.innerHeight) { itemContextMenu.style.top = `${mouseY - menuRect.height}px`; }
+            if (menuRect.right > window.innerWidth) { itemContextMenu.style.left = `${mouseX - menuRect.width}px`; }
         }
 
-        function closeContextMenu() {
-            if (itemContextMenu && !itemContextMenu.classList.contains('hidden')) {
-                itemContextMenu.classList.add('hidden');
-                contextMenuItemRecord = null;
-            }
-        }
-
+        function closeContextMenu() { if (itemContextMenu && !itemContextMenu.classList.contains('hidden')) { itemContextMenu.classList.add('hidden'); contextMenuItemRecord = null; } }
         function openItemSettingsModal(record) { currentEditingItemId = record[itemColumnName]; const settings = itemSettings.get(currentEditingItemId) || {}; modalItemName.textContent = `ตั้งค่า: ${currentEditingItemId}`; reorderPointInput.value = settings.reorderPoint || ''; reorderQuantityInput.value = settings.reorderQuantity || ''; itemSettingsModal.classList.remove('hidden'); }
         function closeItemSettingsModal() { itemSettingsModal.classList.add('hidden'); currentEditingItemId = null; }
         function openCategoryActionsModal(category) { currentEditingCategory = category; categoryModalName.textContent = `จัดการหมวดหมู่: ${category.name}`; categoryActionsModal.classList.remove('hidden'); }
@@ -935,6 +933,18 @@
         function showError(message) { errorMessageEl.textContent = `เกิดข้อผิดพลาด: ${message}`; errorEl.classList.remove('hidden'); }
         function showNoData() { noDataEl.querySelector('p').textContent = 'ไม่พบข้อมูล'; noDataEl.classList.remove('hidden'); tableEl.classList.add('hidden'); }
         
+        // --- EVENT LISTENERS ---
+        prevPageBtn.addEventListener('click', () => {
+            if (currentPage > 1) {
+                currentPage--;
+                displayData(currentRecords);
+            }
+        });
+        nextPageBtn.addEventListener('click', () => {
+            currentPage++;
+            displayData(currentRecords);
+        });
+
         categoryList.addEventListener('wheel', (event) => { if (window.matchMedia('(pointer: fine)').matches) { event.preventDefault(); categoryList.scrollLeft += event.deltaY; } }, { passive: false });
         addCategoryBtn.addEventListener('click', addCategory); 
         categoryInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') addCategory(); });
@@ -966,122 +976,55 @@
         requisitionListBody.addEventListener('click', (e) => { if(e.target.classList.contains('delete-req-btn')) { deleteRequisitionItem(e.target.dataset.id); }});
         confirmRequisitionBtn.addEventListener('click', confirmRequisition);
 
-        window.addEventListener('click', (e) => {
-            if (itemContextMenu && !itemContextMenu.classList.contains('hidden')) {
-                if (!itemContextMenu.contains(e.target)) {
-                    closeContextMenu();
-                }
-            }
-        });
+        window.addEventListener('click', (e) => { if (itemContextMenu && !itemContextMenu.classList.contains('hidden')) { if (!itemContextMenu.contains(e.target)) { closeContextMenu(); } } });
         window.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeContextMenu(); });
 
-        contextMenuSettingsBtn.addEventListener('click', () => {
-            if (contextMenuItemRecord) openItemSettingsModal(contextMenuItemRecord);
-            closeContextMenu();
-        });
-
-        contextMenuHideBtn.addEventListener('click', () => {
-            if (contextMenuItemRecord && itemColumnName) {
-                const itemId = contextMenuItemRecord[itemColumnName];
-                hideItem(itemId);
-            }
-            closeContextMenu();
-        });
-        
-        contextMenuAddHeaderBtn.addEventListener('click', () => {
-            if (contextMenuItemRecord && itemColumnName) {
-                const itemId = contextMenuItemRecord[itemColumnName];
-                openAddHeaderModal(itemId);
-            }
-            closeContextMenu();
-        });
+        contextMenuSettingsBtn.addEventListener('click', () => { if (contextMenuItemRecord) openItemSettingsModal(contextMenuItemRecord); closeContextMenu(); });
+        contextMenuHideBtn.addEventListener('click', () => { if (contextMenuItemRecord && itemColumnName) { const itemId = contextMenuItemRecord[itemColumnName]; hideItem(itemId); } closeContextMenu(); });
+        contextMenuAddHeaderBtn.addEventListener('click', () => { if (contextMenuItemRecord && itemColumnName) { const itemId = contextMenuItemRecord[itemColumnName]; openAddHeaderModal(itemId); } closeContextMenu(); });
 
         function handleKeyNavigation(e) {
-            if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
-                return;
-            }
-
+            if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) { return; }
             const activeElement = document.activeElement;
             const isWithinGrid = activeElement.tagName === 'TD' && activeElement.closest('#data-table tbody');
-
             if (isWithinGrid) {
                 e.preventDefault();
                 const tableBody = activeElement.closest('tbody');
                 const grid = Array.from(tableBody.querySelectorAll('tr')).map(r => Array.from(r.querySelectorAll('td')));
-                
                 let currentRowIndex = -1, currentCellIndex = -1;
                 for (let i = 0; i < grid.length; i++) {
                     let foundIndex = grid[i].indexOf(activeElement);
-                    if (foundIndex !== -1) {
-                        currentRowIndex = i;
-                        currentCellIndex = foundIndex;
-                        break;
-                    }
+                    if (foundIndex !== -1) { currentRowIndex = i; currentCellIndex = foundIndex; break; }
                 }
-
                 if (currentRowIndex === -1) return;
-
-                if (grid[currentRowIndex].length > 1) {
-                    lastGoodCellIndex = currentCellIndex;
-                }
-
+                if (grid[currentRowIndex].length > 1) { lastGoodCellIndex = currentCellIndex; }
                 let nextRowIndex = currentRowIndex;
                 let nextCellIndex = currentCellIndex;
-
                 switch (e.key) {
-                    case 'ArrowUp':
-                        nextRowIndex = Math.max(0, currentRowIndex - 1);
-                        nextCellIndex = lastGoodCellIndex;
-                        break;
-                    case 'ArrowDown':
-                        nextRowIndex = Math.min(grid.length - 1, currentRowIndex + 1);
-                        nextCellIndex = lastGoodCellIndex;
-                        break;
-                    case 'ArrowLeft':
-                        nextCellIndex = Math.max(0, currentCellIndex - 1);
-                        break;
-                    case 'ArrowRight':
-                        nextCellIndex = Math.min(grid[currentRowIndex].length - 1, currentCellIndex + 1);
-                        break;
+                    case 'ArrowUp': nextRowIndex = Math.max(0, currentRowIndex - 1); nextCellIndex = lastGoodCellIndex; break;
+                    case 'ArrowDown': nextRowIndex = Math.min(grid.length - 1, currentRowIndex + 1); nextCellIndex = lastGoodCellIndex; break;
+                    case 'ArrowLeft': nextCellIndex = Math.max(0, currentCellIndex - 1); break;
+                    case 'ArrowRight': nextCellIndex = Math.min(grid[currentRowIndex].length - 1, currentCellIndex + 1); break;
                 }
-                
                 const targetRow = grid[nextRowIndex];
                 if (!targetRow) return;
-
                 const clampedCellIndex = Math.min(nextCellIndex, targetRow.length - 1);
                 const targetCell = targetRow[clampedCellIndex];
-                
-                if (targetCell) {
-                    activeElement.setAttribute('tabindex', '-1');
-                    targetCell.setAttribute('tabindex', '0');
-                    targetCell.focus();
-                }
+                if (targetCell) { activeElement.setAttribute('tabindex', '-1'); targetCell.setAttribute('tabindex', '0'); targetCell.focus(); }
                 return;
             }
-
-            if ((activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA') && ['ArrowLeft', 'ArrowRight'].includes(e.key)) {
-                return;
-            }
+            if ((activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA') && ['ArrowLeft', 'ArrowRight'].includes(e.key)) { return; }
             e.preventDefault();
             const focusableSelector = 'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
-            const allFocusable = Array.from(document.querySelectorAll(focusableSelector))
-                                       .filter(el => el.offsetParent !== null && !el.closest('.hidden'));
+            const allFocusable = Array.from(document.querySelectorAll(focusableSelector)).filter(el => el.offsetParent !== null && !el.closest('.hidden'));
             if (allFocusable.length === 0) return;
-            
             let currentIndex = allFocusable.indexOf(activeElement);
             let nextIndex = 0;
-
-            if (currentIndex === -1) {
-                 nextIndex = 0;
-            } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
-                nextIndex = currentIndex > 0 ? currentIndex - 1 : allFocusable.length - 1;
-            } else { 
-                nextIndex = currentIndex < allFocusable.length - 1 ? currentIndex + 1 : 0;
-            }
-            
+            if (currentIndex === -1) { nextIndex = 0; } 
+            else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') { nextIndex = currentIndex > 0 ? currentIndex - 1 : allFocusable.length - 1; } 
+            else { nextIndex = currentIndex < allFocusable.length - 1 ? currentIndex + 1 : 0; }
             allFocusable[nextIndex]?.focus();
         }
-
         document.addEventListener('keydown', handleKeyNavigation);
 
         const navWrapper = document.getElementById('nav-toggle-wrapper'), navTrigger = document.getElementById('nav-trigger'), navIcon = document.getElementById('nav-trigger-icon');
