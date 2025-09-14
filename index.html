@@ -1,0 +1,1097 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ข้อมูลจาก Google Sheet</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    <style>
+        body {
+            font-family: 'Sarabun', sans-serif;
+        }
+        .sortable-ghost {
+            background-color: #c0e2ff;
+            opacity: 0.7;
+        }
+        .sortable-chosen {
+            cursor: grabbing;
+        }
+        #table-body tr, #category-list > div, #manage-category-list > div {
+            cursor: grab;
+        }
+        #notification-toast {
+            transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+            transform: translateY(-20px);
+        }
+        #notification-toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        #category-list::-webkit-scrollbar {
+            height: 4px;
+        }
+        #category-list::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        #category-list::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 2px;
+        }
+        #category-list::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        
+        /* --- Styles for Focus --- */
+        :is(button, [href], input, [tabindex]):focus {
+             outline: 2px solid #3b82f6; /* blue-500 */
+             outline-offset: 2px;
+             border-radius: 2px;
+        }
+        /* Specific focus for table cells */
+        #table-body td:focus {
+            outline: 2px solid #1d4ed8; /* blue-700 */
+            outline-offset: -2px;
+            background-color: #eff6ff; /* blue-50 */
+        }
+        
+        /* --- CSS เพิ่มเติมสำหรับเส้นตาราง --- */
+        .show-grid {
+            border-collapse: collapse;
+        }
+        .show-grid th, .show-grid td {
+           border: 1px solid #e5e7eb; /* Tailwind gray-200 */
+        }
+        /* --- จบส่วนที่เพิ่ม --- */
+
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+<div id="nav-toggle-wrapper" class="fixed top-0 left-0 right-0 z-30 h-4 bg-white shadow-md overflow-hidden transition-all duration-300 ease-in-out">
+    <div class="container mx-auto lg:w-1/2 h-full relative">
+        <div class="border-b border-gray-200">
+            <nav class="flex justify-center -mb-px space-x-2" aria-label="Tabs">
+                <button id="nav-products" class="whitespace-nowrap py-4 px-2 border-b-2 font-medium text-sm text-blue-600 border-blue-600">
+                    รายการสินค้า
+                </button>
+                <button id="nav-requisition" class="whitespace-nowrap py-4 px-2 border-b-2 font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 border-transparent">
+                    รายการเบิกของ
+                </button>
+                <button id="nav-history" class="whitespace-nowrap py-4 px-2 border-b-2 font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 border-transparent">
+                    ประวัติ
+                </button>
+                <button id="nav-manage" class="whitespace-nowrap py-4 px-2 border-b-2 font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 border-transparent">
+                    จัดการ
+                </button>
+                <button id="nav-account" class="whitespace-nowrap py-4 px-2 border-b-2 font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 border-transparent">
+                    บัญชี
+                </button>
+            </nav>
+        </div>
+        <div id="nav-trigger" class="absolute bottom-0 left-0 w-full h-4 bg-white cursor-pointer border-t border-gray-200 flex items-center justify-center">
+            <svg id="nav-trigger-icon" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400 transition-transform duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+        </div>
+    </div>
+</div>
+
+<div class="container mx-auto px-2 py-4 pt-8 sm:p-6 md:p-8 lg:w-1/2 pb-24">
+    
+    <div id="auth-container" class="mb-8">
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <form id="login-form">
+                <h2 class="text-2xl font-bold text-gray-700 mb-4 text-center">เข้าสู่ระบบ</h2>
+                <div class="mb-4">
+                    <label for="login-email" class="block text-sm font-medium text-gray-700">อีเมล</label>
+                    <input type="email" id="login-email" required class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400">
+                </div>
+                <div class="mb-6">
+                    <label for="login-password" class="block text-sm font-medium text-gray-700">รหัสผ่าน</label>
+                    <input type="password" id="login-password" required class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400">
+                </div>
+                <button type="submit" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-md transition duration-300">เข้าสู่ระบบ</button>
+                <p id="login-error" class="text-red-500 text-sm mt-2 text-center h-4"></p>
+                <p class="text-sm text-center text-gray-600 mt-4">
+                    ยังไม่มีบัญชี? <button type="button" id="show-register-btn" class="font-medium text-blue-600 hover:text-blue-500">สมัครสมาชิกที่นี่</button>
+                </p>
+            </form>
+
+            <form id="register-form" class="hidden">
+                <h2 class="text-2xl font-bold text-gray-700 mb-4 text-center">สมัครสมาชิกใหม่</h2>
+                 <div class="mb-4">
+                    <label for="register-email" class="block text-sm font-medium text-gray-700">อีเมล</label>
+                    <input type="email" id="register-email" required class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400">
+                </div>
+                <div class="mb-6">
+                    <label for="register-password" class="block text-sm font-medium text-gray-700">รหัสผ่าน (อย่างน้อย 6 ตัวอักษร)</label>
+                    <input type="password" id="register-password" required class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400">
+                </div>
+                <button type="submit" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-md transition duration-300">สมัครสมาชิก</button>
+                <p id="register-error" class="text-red-500 text-sm mt-2 text-center h-4"></p>
+                <p class="text-sm text-center text-gray-600 mt-4">
+                    มีบัญชีอยู่แล้ว? <button type="button" id="show-login-btn" class="font-medium text-blue-600 hover:text-blue-500">เข้าสู่ระบบที่นี่</button>
+                </p>
+            </form>
+        </div>
+    </div>
+
+    <div id="app-container" class="hidden">
+        
+        <div id="product-list-view">
+            <div id="data-container" class="bg-white rounded-lg shadow-md overflow-hidden">
+                <div id="loading" class="p-8 text-center">
+                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                    <p class="mt-4 text-gray-600">กำลังโหลดข้อมูล...</p>
+                </div>
+                <div id="error" class="hidden p-8 text-center text-red-600 bg-red-50 rounded-lg">
+                    <h3 class="font-bold text-lg">เกิดข้อผิดพลาด</h3>
+                    <p id="error-message" class="mt-2">ไม่สามารถโหลดข้อมูลได้ในขณะนี้</p>
+                </div>
+                <div class="overflow-x-auto">
+                    <table id="data-table" class="hidden w-full min-w-full table-auto show-grid">
+                        <thead id="table-head" class="bg-gray-50"></thead>
+                        <tbody id="table-body" class="bg-white divide-y divide-gray-200"></tbody>
+                    </table>
+                </div>
+                <div id="no-data" class="hidden p-8 text-center text-gray-500">
+                    <p>ไม่พบข้อมูล</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="requisition-view" class="hidden">
+                       <div class="bg-white rounded-lg shadow-md p-4 sm:p-6">
+                               <div class="flex justify-between items-center mb-4">
+                                      <h2 class="text-2xl font-bold text-gray-700">รายการเบิกของ</h2>
+                                      <div class="flex items-center gap-2">
+                                          <button id="auto-requisition-btn" class="bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded-md transition duration-300">
+                                              เบิกของอัตโนมัติ
+                                          </button>
+                                          <button id="confirm-requisition-btn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-md transition duration-300 disabled:bg-gray-400">
+                                              ยืนยัน
+                                          </button>
+                                      </div>
+                               </div>
+                               <div class="overflow-x-auto">
+                                   <table class="w-full min-w-full divide-y divide-gray-200 show-grid">
+                                       <thead class="bg-gray-200">
+                                           <tr>
+                                               <th scope="col" class="py-3 px-2 text-center text-xs font-medium text-gray-600 uppercase tracking-wider w-8">ลำดับ</th>
+                                               <th scope="col" class="py-3 px-2 text-left text-xs font-medium text-gray-600 uppercase tracking-wider w-auto">สินค้า</th>
+                                               <th scope="col" class="py-3 px-2 text-center text-xs font-medium text-gray-600 uppercase tracking-wider w-14">จำนวนเบิก</th>
+                                               <th scope="col" class="py-3 px-2 text-center text-xs font-medium text-gray-600 uppercase tracking-wider w-14">หน่วย</th>
+                                               <th scope="col" class="py-3 px-2 text-center text-xs font-medium text-gray-600 uppercase tracking-wider w-12">จัดการ</th>
+                                           </tr>
+                                       </thead>
+                                       <tbody id="requisition-list-body" class="bg-white divide-y divide-gray-200">
+                                       </tbody>
+                                   </table>
+                               </div>
+                          </div>
+        </div>
+
+         <div id="history-view" class="hidden">
+            <div class="bg-white rounded-lg shadow-md p-4 sm:p-6">
+                <h2 class="text-2xl font-bold text-gray-700 mb-4">ประวัติการเบิกของ</h2>
+                <div id="history-list-container" class="space-y-6">
+                </div>
+            </div>
+        </div>
+
+        <div id="manage-view" class="hidden">
+            <div class="bg-white rounded-lg shadow-md p-6 space-y-8">
+                <div>
+                    <h2 class="text-xl font-bold text-gray-700 mb-4">เพิ่มหมวดหมู่ใหม่</h2>
+                    <div class="flex flex-col sm:flex-row gap-4">
+                        <input type="text" id="category-input" placeholder="ใส่ชื่อหมวดหมู่ที่นี่..." class="flex-grow p-2 border border-gray-300 rounded-md">
+                        <button id="add-category-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-md transition duration-300">
+                            เพิ่มหมวดหมู่
+                        </button>
+                    </div>
+                </div>
+
+                <div>
+                    <h2 class="text-xl font-bold text-gray-700 mb-4">จัดการหมวดหมู่ที่มีอยู่</h2>
+                    <p class="text-sm text-gray-500 mb-2">คลิกขวา หรือ ดับเบิ้ลคลิก ที่ชื่อหมวดหมู่เพื่อแก้ไขหรือลบ</p>
+                    <div id="manage-category-list" class="flex flex-wrap gap-2 items-center">
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="account-view" class="hidden">
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <p class="text-sm text-gray-500">ลงชื่อเข้าใช้ในชื่อ:</p>
+                        <p id="user-email" class="font-semibold text-gray-800"></p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                         <button id="app-settings-btn" title="ตั้งค่า" class="p-2 rounded-md hover:bg-gray-100 text-gray-600 hover:text-blue-600 transition-colors">
+                             <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                             </svg>
+                         </button>
+                        <button id="logout-btn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-md transition duration-300">ออกจากระบบ</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="text-center mt-8 text-gray-400 text-sm">
+        <p>สร้างโดย Gemini</p>
+    </footer>
+</div>
+
+<div id="category-nav-view" class="hidden fixed bottom-0 left-0 right-0 z-20 bg-white shadow-[0_-2px_10px_-3px_rgba(0,0,0,0.1)] border-t border-gray-200">
+    <div class="container mx-auto lg:w-1/2">
+        <nav id="category-list" class="flex gap-x-2 px-2 overflow-x-auto" aria-label="Category Tabs">
+        </nav>
+    </div>
+</div>
+
+<div id="item-settings-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-30">
+    <div class="relative mx-auto p-5 border w-11/12 max-w-md shadow-lg rounded-md bg-white">
+        <div class="mt-3 text-center">
+            <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-item-name">ตั้งค่าสินค้า</h3>
+            <div class="mt-4 px-7 py-3 space-y-4 text-left">
+                <div>
+                    <label for="reorder-point" class="block text-sm font-medium text-gray-700">จุดเบิกของ (Reorder Point)</label>
+                    <input type="number" id="reorder-point" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm" placeholder="เช่น 10">
+                </div>
+                <div>
+                    <label for="reorder-quantity" class="block text-sm font-medium text-gray-700">จำนวนเบิกอัตโนมัติ</label>
+                    <input type="number" id="reorder-quantity" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm" placeholder="เช่น 50">
+                </div>
+            </div>
+            <div class="items-center px-4 py-3">
+                <button id="modal-ok-btn" class="px-4 py-2 bg-blue-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-blue-600">
+                    ตกลง
+                </button>
+                <button id="modal-cancel-btn" class="mt-3 px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-300">
+                    ยกเลิก
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="category-actions-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-30">
+    <div class="relative mx-auto p-5 border w-11/12 max-w-sm shadow-lg rounded-md bg-white">
+        <div class="mt-3 text-center">
+            <h3 class="text-lg leading-6 font-medium text-gray-900" id="category-modal-name">จัดการหมวดหมู่</h3>
+            <div class="mt-6 space-y-3">
+                <button id="edit-category-btn" class="w-full px-4 py-3 bg-blue-500 text-white text-base font-medium rounded-md shadow-sm hover:bg-blue-600 flex items-center justify-center">
+                    <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z" />
+                    </svg>
+                    แก้ไขชื่อหมวดหมู่
+                </button>
+                <button id="delete-category-btn" class="w-full px-4 py-3 bg-red-500 text-white text-base font-medium rounded-md shadow-sm hover:bg-red-600 flex items-center justify-center">
+                    <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    ลบหมวดหมู่
+                </button>
+            </div>
+            <div class="mt-6">
+                <button id="category-modal-cancel-btn" class="w-full px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md shadow-sm hover:bg-gray-300">
+                    ยกเลิก
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="add-header-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-30">
+    <div class="relative mx-auto p-5 border w-11/12 max-w-md shadow-lg rounded-md bg-white">
+        <div class="mt-3 text-center">
+            <h3 class="text-lg leading-6 font-medium text-gray-900">เพิ่มหัวข้อใหม่</h3>
+            <div class="mt-4 px-7 py-3">
+                <input type="text" id="header-input" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm" placeholder="ใส่ชื่อหัวข้อที่นี่...">
+            </div>
+            <div class="items-center px-4 py-3">
+                <button id="header-modal-ok-btn" class="px-4 py-2 bg-green-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-green-600">
+                    เพิ่มหัวข้อ
+                </button>
+                <button id="header-modal-cancel-btn" class="mt-3 px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-300">
+                    ยกเลิก
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="header-actions-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-30">
+    <div class="relative mx-auto p-5 border w-11/12 max-w-sm shadow-lg rounded-md bg-white">
+        <div class="mt-3 text-center">
+            <h3 class="text-lg leading-6 font-medium text-gray-900" id="header-modal-name">จัดการหัวข้อ</h3>
+            <div class="mt-6 space-y-3">
+                <button id="edit-header-btn" class="w-full px-4 py-3 bg-blue-500 text-white text-base font-medium rounded-md shadow-sm hover:bg-blue-600 flex items-center justify-center">
+                    <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z" /></svg>
+                    แก้ไขหัวข้อ
+                </button>
+                <button id="delete-header-btn" class="w-full px-4 py-3 bg-red-500 text-white text-base font-medium rounded-md shadow-sm hover:bg-red-600 flex items-center justify-center">
+                    <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                    ลบหัวข้อ
+                </button>
+            </div>
+            <div class="mt-6">
+                <button id="header-actions-cancel-btn" class="w-full px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md shadow-sm hover:bg-gray-300">
+                    ยกเลิก
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="app-settings-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-40">
+    <div class="relative mx-auto p-5 border w-11/12 max-w-md shadow-lg rounded-md bg-white">
+        <div class="mt-3">
+            <h3 class="text-xl text-center leading-6 font-medium text-gray-900">ตั้งค่าการเบิกของอัตโนมัติ</h3>
+             <div class="mt-4 px-7 py-3 space-y-4 text-left">
+                  <div>
+                       <label for="setting-trigger-col" class="block text-sm font-medium text-gray-700">คอลัมน์ตรวจสอบสต็อก</label>
+                       <input type="text" id="setting-trigger-col" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400">
+                       <p class="mt-1 text-xs text-gray-500">ชื่อคอลัมน์ที่ใช้ตรวจสอบว่าสต็อกถึงจุดที่ต้องเบิกหรือไม่</p>
+                  </div>
+                   <div>
+                       <label for="setting-calc-col" class="block text-sm font-medium text-gray-700">คอลัมน์คำนวณจำนวน</label>
+                       <input type="text" id="setting-calc-col" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400">
+                       <p class="mt-1 text-xs text-gray-500">ชื่อคอลัมน์ที่ใช้ในการคำนวณปริมาณเบิก (ถ้ามี)</p>
+                  </div>
+                   <div>
+                       <label for="setting-unit-col" class="block text-sm font-medium text-gray-700">คอลัมน์หน่วยนับ</label>
+                       <input type="text" id="setting-unit-col" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400">
+                       <p class="mt-1 text-xs text-gray-500">ชื่อคอลัมน์ที่ระบุหน่วยของสินค้า</p>
+                  </div>
+            </div>
+            <div class="items-center px-4 py-3 sm:flex">
+                 <button id="app-settings-save-btn" class="w-full sm:w-auto px-4 py-2 bg-blue-500 text-white text-base font-medium rounded-md shadow-sm hover:bg-blue-600">
+                     บันทึก
+                 </button>
+                 <button id="app-settings-cancel-btn" class="mt-3 sm:mt-0 sm:ml-3 w-full sm:w-auto px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md shadow-sm hover:bg-gray-300">
+                     ยกเลิก
+                 </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="confirm-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
+    <div class="relative mx-auto p-5 border w-11/12 max-w-sm shadow-lg rounded-md bg-white">
+        <div class="mt-3 text-center">
+            <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+                <svg class="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+            </div>
+            <h3 class="text-lg leading-6 font-medium text-gray-900 mt-4" id="confirm-modal-title">ยืนยันการลบ</h3>
+            <div class="mt-2 px-7 py-3">
+                <p class="text-sm text-gray-500" id="confirm-modal-body">คุณแน่ใจหรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้</p>
+            </div>
+            <div class="items-center px-4 py-3 sm:flex">
+                <button id="confirm-modal-ok-btn" class="w-full sm:w-auto px-4 py-2 bg-red-500 text-white text-base font-medium rounded-md shadow-sm hover:bg-red-600">
+                    ยืนยัน
+                </button>
+                <button id="confirm-modal-cancel-btn" class="mt-3 sm:mt-0 sm:ml-3 w-full sm:w-auto px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md shadow-sm hover:bg-gray-300">
+                    ยกเลิก
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="notification-toast" class="hidden opacity-0 fixed top-5 right-5 text-white py-3 px-5 rounded-lg shadow-lg z-50">
+    <p id="notification-message"></p>
+</div>
+
+<div id="item-context-menu" class="hidden fixed z-40 bg-white shadow-lg rounded-md ring-1 ring-black ring-opacity-5 focus:outline-none w-48">
+    <div class="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
+        <button id="context-menu-settings" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 flex items-center gap-3" role="menuitem">
+            <svg class="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+            <span>ตั้งค่าสินค้า</span>
+        </button>
+        <button id="context-menu-hide" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 flex items-center gap-3" role="menuitem">
+            <svg class="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a9.97 9.97 0 01-1.563 3.029m0 0l-2.14 2.14" /></svg>
+            <span>ซ่อนแถวสินค้า</span>
+        </button>
+        <div class="border-t border-gray-100 my-1"></div>
+        <button id="context-menu-add-header" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 flex items-center gap-3" role="menuitem">
+            <svg class="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h10a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2z"></path></svg>
+            <span>เพิ่มหัวข้อใหม่</span>
+        </button>
+    </div>
+</div>
+
+<script type="module">
+    // Firebase Imports
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, setLogLevel, getDocs, setDoc, getDoc, Timestamp, writeBatch, runTransaction, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const sheetUrl = 'https://script.google.com/macros/s/AKfycbyW37lyYs-WKqsSyoG8PO2emr3bH1J0CnkNWKnZ409-y43qo-hbOy9UFO6L3dnSP8FlHg/exec';
+
+        // --- DOM Elements ---
+        const authContainer = document.getElementById('auth-container');
+        const appContainer = document.getElementById('app-container');
+        const loginForm = document.getElementById('login-form');
+        const registerForm = document.getElementById('register-form');
+        const loginEmailInput = document.getElementById('login-email');
+        const loginPasswordInput = document.getElementById('login-password');
+        const registerEmailInput = document.getElementById('register-email');
+        const registerPasswordInput = document.getElementById('register-password');
+        const loginErrorEl = document.getElementById('login-error');
+        const registerErrorEl = document.getElementById('register-error');
+        const showRegisterBtn = document.getElementById('show-register-btn');
+        const showLoginBtn = document.getElementById('show-login-btn');
+        const userEmailEl = document.getElementById('user-email');
+        const logoutBtn = document.getElementById('logout-btn');
+        const loadingEl = document.getElementById('loading');
+        const errorEl = document.getElementById('error');
+        const errorMessageEl = document.getElementById('error-message');
+        const noDataEl = document.getElementById('no-data');
+        const tableEl = document.getElementById('data-table');
+        const tableHead = document.getElementById('table-head');
+        const tableBody = document.getElementById('table-body');
+        const categoryInput = document.getElementById('category-input');
+        const addCategoryBtn = document.getElementById('add-category-btn');
+        const categoryList = document.getElementById('category-list');
+        const manageCategoryList = document.getElementById('manage-category-list');
+        const navProductsBtn = document.getElementById('nav-products');
+        const navRequisitionBtn = document.getElementById('nav-requisition');
+        const navHistoryBtn = document.getElementById('nav-history');
+        const navManageBtn = document.getElementById('nav-manage');
+        const navAccountBtn = document.getElementById('nav-account');
+        const productListView = document.getElementById('product-list-view');
+        const requisitionView = document.getElementById('requisition-view');
+        const historyView = document.getElementById('history-view');
+        const manageView = document.getElementById('manage-view');
+        const accountView = document.getElementById('account-view');
+        const categoryNavView = document.getElementById('category-nav-view');
+        const autoRequisitionBtn = document.getElementById('auto-requisition-btn');
+        const requisitionListBody = document.getElementById('requisition-list-body');
+        const confirmRequisitionBtn = document.getElementById('confirm-requisition-btn');
+        const historyListContainer = document.getElementById('history-list-container');
+        const itemSettingsModal = document.getElementById('item-settings-modal');
+        const modalItemName = document.getElementById('modal-item-name');
+        const reorderPointInput = document.getElementById('reorder-point');
+        const reorderQuantityInput = document.getElementById('reorder-quantity');
+        const modalOkBtn = document.getElementById('modal-ok-btn');
+        const modalCancelBtn = document.getElementById('modal-cancel-btn');
+        const categoryActionsModal = document.getElementById('category-actions-modal');
+        const categoryModalName = document.getElementById('category-modal-name');
+        const editCategoryBtn = document.getElementById('edit-category-btn');
+        const deleteCategoryBtn = document.getElementById('delete-category-btn');
+        const categoryModalCancelBtn = document.getElementById('category-modal-cancel-btn');
+        const addHeaderModal = document.getElementById('add-header-modal');
+        const headerInput = document.getElementById('header-input');
+        const headerModalOkBtn = document.getElementById('header-modal-ok-btn');
+        const headerModalCancelBtn = document.getElementById('header-modal-cancel-btn');
+        const headerActionsModal = document.getElementById('header-actions-modal');
+        const headerModalName = document.getElementById('header-modal-name');
+        const editHeaderBtn = document.getElementById('edit-header-btn');
+        const deleteHeaderBtn = document.getElementById('delete-header-btn');
+        const headerActionsCancelBtn = document.getElementById('header-actions-cancel-btn');
+        const confirmModal = document.getElementById('confirm-modal');
+        const confirmModalTitle = document.getElementById('confirm-modal-title');
+        const confirmModalBody = document.getElementById('confirm-modal-body');
+        const confirmModalOkBtn = document.getElementById('confirm-modal-ok-btn');
+        const confirmModalCancelBtn = document.getElementById('confirm-modal-cancel-btn');
+        const appSettingsModal = document.getElementById('app-settings-modal');
+        const appSettingsBtn = document.getElementById('app-settings-btn');
+        const appSettingsSaveBtn = document.getElementById('app-settings-save-btn');
+        const appSettingsCancelBtn = document.getElementById('app-settings-cancel-btn');
+        const settingTriggerColInput = document.getElementById('setting-trigger-col');
+        const settingCalcColInput = document.getElementById('setting-calc-col');
+        const settingUnitColInput = document.getElementById('setting-unit-col');
+        const notificationToast = document.getElementById('notification-toast');
+        const notificationMessage = document.getElementById('notification-message');
+        const itemContextMenu = document.getElementById('item-context-menu');
+        const contextMenuSettingsBtn = document.getElementById('context-menu-settings');
+        const contextMenuHideBtn = document.getElementById('context-menu-hide');
+        const contextMenuAddHeaderBtn = document.getElementById('context-menu-add-header');
+        
+        let allRecords = [], currentRecords = [], categories = [], sortOrdersMap = {}, categoryOrder = [], requisitionList = [], historyList = [];
+        let customRows = new Map(), itemSettings = new Map(), hiddenItemsMap = {};
+        let itemColumnName = '', activeCategoryName = null, currentEditingItemId = null, currentEditingCategory = null, currentEditingHeaderId = null, currentEditingHeaderText = null, confirmCallback = null, notificationTimeout = null, insertHeaderAboveId = null;
+        let contextMenuItemRecord = null;
+        let sortableInstance = null, categorySortableInstance = null;
+        let appSettings = { triggerStockColumnName: 'รักษ์ยา', calculationStockColumnName: 'เบบี้ช็อป', unitColumnName: 'หน่วย' };
+        let resolveCategoriesLoaded, categoriesFirstLoad = true;
+        const categoriesLoadedPromise = new Promise(resolve => { resolveCategoriesLoaded = resolve; });
+        let userId = null;
+        let categoriesCollectionRef, hiddenItemsDocRef, sortOrdersDocRef, customRowsCollectionRef, categoryOrderDocRef, itemSettingsCollectionRef, requisitionListCollectionRef, requisitionHistoryCollectionRef, countersDocRef, appSettingsDocRef;
+        let unsubscribes = [];
+        let lastGoodCellIndex = 0; 
+
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+        const firebaseConfig = {
+          apiKey: "AIzaSyAqMV6X0Tfs-JwZ4AY_RJELr55pFJslvpU",
+          authDomain: "the-byway-468900-b7.firebaseapp.com",
+          projectId: "the-byway-468900-b7",
+          storageBucket: "the-byway-468900-b7.firebasestorage.app",
+          messagingSenderId: "335672843228",
+          appId: "1:335672843228:web:0ab6949a49434c6535cd19",
+          measurementId: "G-X7T2BK579Q"
+        };
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        setLogLevel('debug');
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                userId = user.uid;
+                authContainer.classList.add('hidden');
+                appContainer.classList.remove('hidden');
+                document.querySelectorAll('#user-email').forEach(el => el.textContent = user.email);
+                initializeListeners(userId);
+                switchView('products');
+                if(allRecords.length === 0) fetchData(); 
+            } else {
+                userId = null;
+                authContainer.classList.remove('hidden');
+                appContainer.classList.add('hidden');
+                unsubscribes.forEach(unsub => unsub && unsub());
+                unsubscribes = [];
+                categories = []; hiddenItemsMap = {}; sortOrdersMap = {}; categoryOrder = []; customRows.clear(); itemSettings.clear(); requisitionList = []; historyList = [];
+                displayCategories(); 
+            }
+        });
+        
+        function initializeListeners(currentUserId) {
+                 if (!currentUserId) return;
+                 unsubscribes.forEach(unsub => unsub && unsub());
+                 unsubscribes = [];
+                 const userPath = `artifacts/${appId}/users/${currentUserId}`;
+                 categoriesCollectionRef = collection(db, `${userPath}/categories`);
+                 hiddenItemsDocRef = doc(db, `${userPath}/settings`, 'hiddenItemsByCategory');
+                 sortOrdersDocRef = doc(db, `${userPath}/settings`, 'sortOrders');
+                 customRowsCollectionRef = collection(db, `${userPath}/customRows`);
+                 categoryOrderDocRef = doc(db, `${userPath}/settings`, 'categoryOrder');
+                 itemSettingsCollectionRef = collection(db, `${userPath}/itemSettings`);
+                 requisitionListCollectionRef = collection(db, `${userPath}/requisitionList`);
+                 requisitionHistoryCollectionRef = collection(db, `${userPath}/requisitionHistory`);
+                 countersDocRef = doc(db, `${userPath}/settings`, 'counters');
+                 appSettingsDocRef = doc(db, `${userPath}/settings`, 'appSettings');
+                 unsubscribes.push(onSnapshot(categoriesCollectionRef, (snap) => {
+                     const fetchedCategories = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                     if (userId && !fetchedCategories.some(c => c.name === 'อื่นๆ') && !snap.metadata.hasPendingWrites) {
+                         addDoc(categoriesCollectionRef, { name: 'อื่นๆ' }).catch(err => console.error("Could not create 'อื่นๆ' category", err));
+                     } else {
+                         categories = fetchedCategories;
+                         displayCategories();
+                         if (categoriesFirstLoad && resolveCategoriesLoaded) { categoriesFirstLoad = false; resolveCategoriesLoaded(); }
+                     }
+                 }, (err) => showError("โหลดหมวดหมู่ไม่สำเร็จ")));
+                 unsubscribes.push(onSnapshot(hiddenItemsDocRef, (docSnap) => {
+                     const data = docSnap.exists() ? docSnap.data() : {};
+                     hiddenItemsMap = {}; 
+                     for (const categoryName in data) { if (Array.isArray(data[categoryName])) { hiddenItemsMap[categoryName] = new Set(data[categoryName]); } }
+                     if (allRecords.length > 0) { displayData(currentRecords); }
+                 }, (err) => showError("โหลดรายการที่ซ่อนไม่สำเร็จ")));
+                 unsubscribes.push(onSnapshot(sortOrdersDocRef, (snap) => { sortOrdersMap = (snap.exists() && snap.data().orders) ? snap.data().orders : {}; if (allRecords.length > 0) displayData(currentRecords); }, (err) => showError("โหลดลำดับจัดเรียงไม่สำเร็จ")));
+                 unsubscribes.push(onSnapshot(categoryOrderDocRef, (snap) => { categoryOrder = (snap.exists() && snap.data().order) ? snap.data().order : []; if (categories.length > 0) displayCategories(); }, (err) => showError("โหลดลำดับหมวดหมู่ไม่สำเร็จ")));
+                 unsubscribes.push(onSnapshot(customRowsCollectionRef, (snap) => { customRows.clear(); snap.docs.forEach(doc => customRows.set(doc.id, doc.data())); if (allRecords.length > 0) displayData(currentRecords); }, (err) => showError("โหลดหัวข้อไม่สำเร็จ")));
+                 unsubscribes.push(onSnapshot(itemSettingsCollectionRef, (snap) => { itemSettings.clear(); snap.docs.forEach(doc => itemSettings.set(doc.id, doc.data())); }, (err) => showError("โหลดการตั้งค่าสินค้าไม่สำเร็จ")));
+                 unsubscribes.push(onSnapshot(requisitionListCollectionRef, (snap) => { requisitionList = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })); displayRequisitionList(); }, (err) => showError("โหลดรายการเบิกของไม่สำเร็จ")));
+                 unsubscribes.push(onSnapshot(requisitionHistoryCollectionRef, (snap) => { historyList = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a,b) => b.timestamp.seconds - a.timestamp.seconds); displayHistory(); }, (err) => showError("โหลดประวัติไม่สำเร็จ")));
+                 unsubscribes.push(onSnapshot(appSettingsDocRef, (snap) => { if (snap.exists()) { appSettings = { ...appSettings, ...snap.data() }; } updateAppSettingsModalInputs(); }, (err) => showError("โหลดการตั้งค่าแอปไม่สำเร็จ")));
+        }
+
+        showRegisterBtn.addEventListener('click', () => { loginForm.classList.add('hidden'); registerForm.classList.remove('hidden'); });
+        showLoginBtn.addEventListener('click', () => { registerForm.classList.add('hidden'); loginForm.classList.remove('hidden'); });
+        loginForm.addEventListener('submit', async (e) => { e.preventDefault(); loginErrorEl.textContent = ''; try { await signInWithEmailAndPassword(auth, loginEmailInput.value, loginPasswordInput.value); } catch (error) { loginErrorEl.textContent = "อีเมลหรือรหัสผ่านไม่ถูกต้อง"; } });
+        registerForm.addEventListener('submit', async (e) => { e.preventDefault(); registerErrorEl.textContent = ''; try { await createUserWithEmailAndPassword(auth, registerEmailInput.value, registerPasswordInput.value); } catch (error) { if (error.code === 'auth/weak-password') registerErrorEl.textContent = 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร'; else if (error.code === 'auth/email-already-in-use') registerErrorEl.textContent = 'อีเมลนี้ถูกใช้งานแล้ว'; else registerErrorEl.textContent = 'เกิดข้อผิดพลาดในการสมัคร'; } });
+        logoutBtn.addEventListener('click', async () => { try { await signOut(auth); } catch (error) { console.error("Logout failed:", error); } });
+        
+        async function saveCurrentSortOrder(newOrder) { if (!sortOrdersDocRef) return; const key = activeCategoryName || '__global__'; try { const docSnap = await getDoc(sortOrdersDocRef); const currentOrders = (docSnap.exists() && docSnap.data().orders) ? docSnap.data().orders : {}; currentOrders[key] = newOrder; await setDoc(sortOrdersDocRef, { orders: currentOrders }); } catch (error) { showError("บันทึกการจัดเรียงไม่สำเร็จ"); } }
+        async function saveCategoryOrder(newOrder) { if (!categoryOrderDocRef) return; try { await setDoc(categoryOrderDocRef, { order: newOrder }); } catch (error) { showError("บันทึกการจัดเรียงหมวดหมู่ไม่สำเร็จ"); } }
+        
+        async function hideItem(itemId) { if (!hiddenItemsDocRef || !itemId) return; const categoryKey = activeCategoryName || '__global__'; try { await updateDoc(hiddenItemsDocRef, { [categoryKey]: arrayUnion(itemId) }); } catch (e) { if (e.code === 'not-found') { try { await setDoc(hiddenItemsDocRef, { [categoryKey]: [itemId] }); } catch (setErr) { showError("ซ่อนรายการไม่สำเร็จ"); } } else { showError("ซ่อนรายการไม่สำเร็จ"); } } }
+        async function unhideItems(idsToUnhide) { if (!hiddenItemsDocRef || !idsToUnhide || idsToUnhide.length === 0) return; const categoryKey = activeCategoryName || '__global__'; try { await updateDoc(hiddenItemsDocRef, { [categoryKey]: arrayRemove(...idsToUnhide) }); } catch (error) { showError("แสดงรายการที่ซ่อนไม่สำเร็จ"); } }
+        async function addCategory() { if (!categoriesCollectionRef) return; const name = categoryInput.value.trim(); if (name && !categories.some(c => c.name.toLowerCase() === name.toLowerCase())) { try { await addDoc(categoriesCollectionRef, { name }); categoryInput.value = ''; showNotification('เพิ่มหมวดหมู่สำเร็จ', false); } catch(error) { showError("เพิ่มหมวดหมู่ไม่สำเร็จ"); } } else if (name) showNotification('มีหมวดหมู่นี้อยู่แล้ว'); }
+        async function editCategory(id, oldName) { if (!categoriesCollectionRef) return; const newName = prompt('แก้ไขชื่อหมวดหมู่:', oldName); if (newName && newName.trim() && newName.trim() !== oldName) { try { await updateDoc(doc(categoriesCollectionRef, id), { name: newName.trim() }); } catch(error) { showError("แก้ไขหมวดหมู่ไม่สำเร็จ"); } } }
+        async function deleteCategory(id) { if (!categoriesCollectionRef) return; try { await deleteDoc(doc(categoriesCollectionRef, id)); displayData(allRecords); } catch(error) { showError("ลบหมวดหมู่ไม่สำเร็จ"); } }
+        async function addHeaderRow(headerText) { if (!headerText || !headerText.trim()) return; try { const key = activeCategoryName || '__global__'; const newDocRef = await addDoc(customRowsCollectionRef, { text: headerText.trim(), categoryName: activeCategoryName }); const docSnap = await getDoc(sortOrdersDocRef); const currentOrders = (docSnap.exists() && docSnap.data().orders) ? docSnap.data().orders : {}; let currentCategoryOrder = currentOrders[key] || []; const newHeaderId = newDocRef.id; if (insertHeaderAboveId) { const insertIndex = currentCategoryOrder.indexOf(insertHeaderAboveId); if (insertIndex !== -1) { currentCategoryOrder.splice(insertIndex, 0, newHeaderId); } else { currentCategoryOrder.unshift(newHeaderId); } } else { currentCategoryOrder.unshift(newHeaderId); } currentOrders[key] = currentCategoryOrder; await setDoc(sortOrdersDocRef, { orders: currentOrders }); } catch (error) { showError("เพิ่มหัวข้อไม่สำเร็จ"); } }
+        async function editHeaderRow(id, oldText) { const newText = prompt("แก้ไขชื่อหัวข้อ:", oldText); if (newText && newText.trim() && newText.trim() !== oldText) { try { await updateDoc(doc(customRowsCollectionRef, id), { text: newText.trim() }); } catch (error) { showError("แก้ไขหัวข้อไม่สำเร็จ"); } } }
+        async function deleteHeaderRow(id) { if (!customRowsCollectionRef || !sortOrdersDocRef) return; try { const key = activeCategoryName || '__global__'; const docSnap = await getDoc(sortOrdersDocRef); const currentOrders = (docSnap.exists() && docSnap.data().orders) ? docSnap.data().orders : {}; const currentCategoryOrder = currentOrders[key] || []; currentOrders[key] = currentCategoryOrder.filter(itemId => itemId !== id); await setDoc(sortOrdersDocRef, { orders: currentOrders }); await deleteDoc(doc(customRowsCollectionRef, id)); } catch (error) { showError("ลบหัวข้อไม่สำเร็จ"); } }
+        async function saveItemSettings() { if (!itemSettingsCollectionRef || !currentEditingItemId) return; const point = parseInt(reorderPointInput.value, 10); const quantity = parseInt(reorderQuantityInput.value, 10); const settings = { reorderPoint: isNaN(point) ? null : point, reorderQuantity: isNaN(quantity) ? null : quantity }; try { await setDoc(doc(itemSettingsCollectionRef, currentEditingItemId), settings); closeItemSettingsModal(); } catch(error) { showError("บันทึกการตั้งค่าไม่สำเร็จ"); } }
+        async function saveAppSettings() { if (!appSettingsDocRef) return; const newSettings = { triggerStockColumnName: settingTriggerColInput.value.trim() || 'รักษ์ยา', calculationStockColumnName: settingCalcColInput.value.trim() || 'เบบี้ช็อป', unitColumnName: settingUnitColInput.value.trim() || 'หน่วย', }; try { await setDoc(appSettingsDocRef, newSettings, { merge: true }); showNotification('บันทึกการตั้งค่าแล้ว', false); closeAppSettingsModal(); } catch (error) { showError("บันทึกการตั้งค่าไม่สำเร็จ"); } }
+        async function generateRequisition() {
+            if (!itemSettingsCollectionRef || allRecords.length === 0) { showNotification('ยังไม่มีข้อมูลสินค้าหรือการตั้งค่า'); return; }
+            if (allRecords.length > 0) { const firstRecordKeys = Object.keys(allRecords[0]); if (!firstRecordKeys.includes(appSettings.triggerStockColumnName) || !firstRecordKeys.includes(appSettings.calculationStockColumnName)) { showError(`ไม่พบคอลัมน์: "${appSettings.triggerStockColumnName}" หรือ "${appSettings.calculationStockColumnName}" ใน Google Sheet กรุณาตรวจสอบการตั้งค่า`); return; } }
+            const itemsToRequisition = [];
+            allRecords.forEach(record => {
+                const itemId = record[itemColumnName];
+                const settings = itemSettings.get(itemId);
+                if (settings && typeof settings.reorderPoint === 'number' && typeof settings.reorderQuantity === 'number') {
+                    const triggerStock = parseInt(record[appSettings.triggerStockColumnName] || 0, 10);
+                    if (!isNaN(triggerStock) && triggerStock <= settings.reorderPoint) {
+                        const calculationStock = parseInt(record[appSettings.calculationStockColumnName], 10);
+                        if (!isNaN(calculationStock) && calculationStock > 0) {
+                            let finalQuantity = settings.reorderQuantity;
+                            const halfCalcStock = 0.5 * calculationStock;
+                            if (settings.reorderQuantity > halfCalcStock) {
+                                const halfAutoQty = 0.5 * settings.reorderQuantity;
+                                finalQuantity = Math.min(halfAutoQty, halfCalcStock);
+                            }
+                            const roundedQuantity = Math.floor(finalQuantity);
+                            if (roundedQuantity > 0) { itemsToRequisition.push({ id: itemId, name: record[itemColumnName], quantity: roundedQuantity, unit: record[appSettings.unitColumnName] || 'ชิ้น' }); }
+                        }
+                    }
+                }
+            });
+            if (itemsToRequisition.length === 0) { showNotification('ไม่พบสินค้าที่ถึงจุดเบิกของตามเงื่อนไข'); return; }
+            try { const batch = writeBatch(db); itemsToRequisition.forEach(item => { const docRef = doc(requisitionListCollectionRef, item.id); batch.set(docRef, { name: item.name, quantity: item.quantity, unit: item.unit }); }); await batch.commit(); showNotification(`สร้างรายการเบิก ${itemsToRequisition.length} รายการสำเร็จ!`, false); switchView('requisition'); } catch (error) { showError("สร้างรายการเบิกไม่สำเร็จ"); }
+        }
+        async function deleteRequisitionItem(id) { if(!requisitionListCollectionRef) return; try { await deleteDoc(doc(requisitionListCollectionRef, id)); } catch (error) { showError("ลบรายการเบิกไม่สำเร็จ"); } }
+        async function confirmRequisition() { if (!requisitionListCollectionRef || requisitionList.length === 0) return; try { await runTransaction(db, async (transaction) => { const counterSnap = await transaction.get(countersDocRef); const currentCounter = counterSnap.exists() ? (counterSnap.data().requisitionNumber || 0) : 0; const newCounter = currentCounter + 1; const now = new Date(); const reqNumber = `REQ-${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}-${newCounter.toString().padStart(4, '0')}`; const historyDocRef = doc(requisitionHistoryCollectionRef); transaction.set(historyDocRef, { requisitionNumber: reqNumber, timestamp: Timestamp.now(), items: requisitionList.map(({id, ...rest}) => rest) }); requisitionList.forEach(item => { transaction.delete(doc(requisitionListCollectionRef, item.id)); }); transaction.set(countersDocRef, { requisitionNumber: newCounter }, { merge: true }); }); showNotification('ยืนยันการเบิกของเรียบร้อย', false); } catch (error) { console.error("Transaction failed: ", error); showError("ยืนยันการเบิกของไม่สำเร็จ"); } }
+        
+        function displayCategories() {
+            if (categorySortableInstance) categorySortableInstance.destroy();
+            categoryList.innerHTML = '';
+            manageCategoryList.innerHTML = '';
+            if (!userId) return;
+            const sortedCategories = [...categories].sort((a, b) => { const indexA = categoryOrder.indexOf(a.id); const indexB = categoryOrder.indexOf(b.id); if (indexA === -1 && indexB === -1) return a.name.localeCompare(b.name, 'th'); if (indexA === -1) return 1; if (indexB === -1) return -1; return indexA - indexB; });
+            if (categories.length === 0) { manageCategoryList.innerHTML = '<p class="text-gray-500 text-sm">ยังไม่มีหมวดหมู่</p>'; categoryList.innerHTML = '<p class="text-gray-500 text-sm">ไปที่แท็บ "จัดการ" เพื่อเพิ่มหมวดหมู่</p>'; return; }
+            sortedCategories.forEach((category) => {
+                const categoryBtn = document.createElement('button');
+                categoryBtn.dataset.id = category.id;
+                categoryBtn.className = 'whitespace-nowrap py-4 px-2 font-bold text-sm focus:outline-none';
+                categoryBtn.classList.toggle('text-blue-600', activeCategoryName === category.name);
+                categoryBtn.classList.toggle('text-gray-500', activeCategoryName !== category.name);
+                categoryBtn.classList.toggle('hover:text-gray-700', activeCategoryName !== category.name);
+                categoryBtn.textContent = category.name;
+                categoryBtn.addEventListener('click', () => {
+                    let filteredRecords;
+                    if (category.name === 'อื่นๆ') { const otherCategoryNames = categories.filter(c => c.name !== 'อื่นๆ').map(c => c.name.toLowerCase()); filteredRecords = allRecords.filter(record => !otherCategoryNames.some(catName => (record[itemColumnName]?.toLowerCase() || '').includes(catName))); } 
+                    else { filteredRecords = allRecords.filter(r => r[itemColumnName]?.toLowerCase().includes(category.name.toLowerCase())); }
+                    noDataEl.querySelector('p').textContent = `ไม่พบสินค้าในหมวดหมู่ "${category.name}"`;
+                    activeCategoryName = category.name;
+                    displayData(filteredRecords);
+                    document.querySelectorAll('#category-list button').forEach(btn => { btn.classList.remove('text-blue-600'); btn.classList.add('text-gray-500', 'hover:text-gray-700'); });
+                    categoryBtn.classList.add('text-blue-600'); categoryBtn.classList.remove('text-gray-500', 'hover:text-gray-700');
+                });
+                categoryList.appendChild(categoryBtn);
+            });
+            sortedCategories.forEach((category) => {
+                const categoryEl = document.createElement('div');
+                categoryEl.dataset.id = category.id;
+                categoryEl.className = 'flex items-center bg-gray-200 rounded-full px-3 py-1 text-sm font-semibold text-gray-700 transition-shadow duration-200 cursor-pointer select-none';
+                categoryEl.setAttribute('tabindex', '0');
+                const nameSpan = document.createElement('span');
+                nameSpan.textContent = category.name;
+                nameSpan.className = 'focus:outline-none';
+
+                // Desktop: right-click
+                categoryEl.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    openCategoryActionsModal(category);
+                });
+
+                // Mobile: double-click
+                categoryEl.addEventListener('dblclick', () => {
+                    openCategoryActionsModal(category);
+                });
+
+                categoryEl.appendChild(nameSpan);
+                manageCategoryList.appendChild(categoryEl);
+            });
+            categorySortableInstance = new Sortable(manageCategoryList, { animation: 150, ghostClass: 'sortable-ghost', delay: 200, delayOnTouchOnly: true, touchStartThreshold: 5, onEnd: (evt) => { const newOrder = Array.from(manageCategoryList.querySelectorAll('div')).map(el => el.dataset.id); saveCategoryOrder(newOrder); } });
+        }
+
+        async function fetchData() { 
+            try { 
+                loadingEl.classList.remove('hidden'); 
+                const response = await fetch(sheetUrl); 
+                if (!response.ok) throw new Error(`Network: ${response.statusText}`); 
+                const data = await response.json(); 
+                if (!Array.isArray(data.data) || data.data.length === 0) { showNoData(); return; } 
+                allRecords = data.data; 
+                itemColumnName = Object.keys(allRecords[0])[0] || ''; 
+                if (!itemColumnName) { showError("ข้อมูลไม่มีคอลัมน์"); return; } 
+                await categoriesLoadedPromise;
+                const carnationCategory = categories.find(c => c.name === 'Carnation');
+                if (carnationCategory) { const carnationButton = Array.from(categoryList.querySelectorAll('button')).find(btn => btn.textContent === 'Carnation'); if (carnationButton) carnationButton.click(); else displayData(allRecords); } 
+                else { displayData(allRecords); }
+            } catch (error) { showError(error.message); } 
+            finally { loadingEl.classList.add('hidden'); } 
+        }
+        
+        function displayData(records) {
+            currentRecords = records;
+            tableHead.innerHTML = '';
+            tableBody.innerHTML = '';
+            if (sortableInstance) sortableInstance.destroy();
+            const allRecordsMap = new Map(allRecords.map(r => [r[itemColumnName], r]));
+            const currentRecordIds = new Set(records.map(r => r[itemColumnName]));
+            const sortKey = activeCategoryName || '__global__';
+            const hiddenIdsForCurrentCategory = hiddenItemsMap[sortKey] || new Set();
+            const currentItemOrder = sortOrdersMap[sortKey] || [];
+            const combinedOrder = [...new Set([...currentItemOrder, ...records.map(r => r[itemColumnName])])];
+            const displayOrder = combinedOrder.filter(id => customRows.has(id) || currentRecordIds.has(id));
+            const visibleIds = new Set(displayOrder.filter(id => !hiddenIdsForCurrentCategory.has(id)));
+
+            if (visibleIds.size === 0) {
+                tableEl.classList.add('hidden');
+                noDataEl.classList.remove('hidden');
+                return;
+            }
+            noDataEl.classList.add('hidden');
+            tableEl.classList.remove('hidden');
+
+            const headers = allRecords.length > 0 ? Object.keys(allRecords[0]) : [];
+            const headerRow = document.createElement('tr');
+            headers.forEach(header => {
+                const th = document.createElement('th');
+                th.scope = 'col';
+                const narrowColumns = ['รวม', 'หน่วย', 'รักษ์ยา', 'เบบี้ช็อป'];
+                let alignment = narrowColumns.includes(header) ? 'text-center' : 'text-left';
+                let padding = narrowColumns.includes(header) ? 'px-1' : 'px-2 sm:px-6';
+                th.className = `${padding} py-1 ${alignment} text-sm font-medium text-gray-500 uppercase tracking-wider ${header === itemColumnName ? 'w-full' : ''}`;
+                const headerContentWrapper = document.createElement('div');
+                headerContentWrapper.className = `flex items-center gap-x-2 ${narrowColumns.includes(header) ? 'justify-center' : ''}`;
+                const headerText = document.createElement('span');
+                headerText.textContent = header.replace(/_/g, ' ');
+                headerContentWrapper.appendChild(headerText);
+
+                if (header === itemColumnName) {
+                    th.id = 'product-header-cell';
+
+                    if (activeCategoryName === 'อื่นๆ') {
+                        const searchInput = document.createElement('input');
+                        searchInput.type = 'text';
+                        searchInput.id = 'product-search-input';
+                        searchInput.placeholder = 'ค้นหาสินค้า...';
+                        searchInput.className = 'ml-4 p-1 border border-gray-300 rounded-md text-sm font-normal normal-case';
+                        searchInput.addEventListener('keyup', () => {
+                            const filter = searchInput.value.toLowerCase();
+                            const rows = tableBody.getElementsByTagName('tr');
+                            for (let i = 0; i < rows.length; i++) {
+                                const cell = rows[i].getElementsByTagName('td')[0];
+                                if (cell) {
+                                    const txtValue = cell.textContent || cell.innerText;
+                                    if (txtValue.toLowerCase().indexOf(filter) > -1) {
+                                        rows[i].style.display = '';
+                                    } else {
+                                        rows[i].style.display = 'none';
+                                    }
+                                }
+                            }
+                        });
+                        headerContentWrapper.appendChild(searchInput);
+                    }
+                }
+
+                th.appendChild(headerContentWrapper);
+                headerRow.appendChild(th);
+            });
+            tableHead.appendChild(headerRow);
+
+            displayOrder.forEach(id => { 
+                if (!visibleIds.has(id)) return; 
+                
+                const row = document.createElement('tr');
+                row.dataset.id = id;
+
+                if(customRows.has(id)){ 
+                    const rowData = customRows.get(id); 
+                    if (rowData.categoryName === activeCategoryName) { 
+                        row.className = 'bg-gray-200 font-bold'; 
+                        const cell = document.createElement('td'); 
+                        cell.colSpan = headers.length; 
+                        cell.className = 'px-4 py-0.5 text-gray-800 text-sm text-left'; 
+                        cell.textContent = rowData.text; 
+                        cell.setAttribute('tabindex', '-1');
+                        row.addEventListener('contextmenu', (e) => { e.preventDefault(); openHeaderActionsModal(id, rowData.text); });
+                        row.addEventListener('dblclick', () => { openHeaderActionsModal(id, rowData.text); }); // Added for mobile
+                        row.appendChild(cell); 
+                        tableBody.appendChild(row); 
+                    } 
+                } else if (allRecordsMap.has(id)) { 
+                    const record = allRecordsMap.get(id); 
+                    row.className = 'hover:bg-gray-50';
+                    row.addEventListener('contextmenu', (e) => { e.preventDefault(); openContextMenu(e, record); });
+                    row.addEventListener('dblclick', (e) => { openContextMenu(e, record); }); // Added for mobile
+
+                    headers.forEach(header => { 
+                        const td = document.createElement('td'); 
+                        td.setAttribute('tabindex', '-1');
+                        const narrowColumns = ['รวม', 'หน่วย', 'รักษ์ยา', 'เบบี้ช็อป'];
+                        let alignment = narrowColumns.includes(header) ? 'text-center' : 'text-left';
+                        let padding = narrowColumns.includes(header) ? 'px-1' : 'px-2 sm:px-6';
+                        td.className = `${padding} py-1 ${alignment} text-sm text-gray-700 break-words ${header === itemColumnName ? 'w-full' : ''}`; 
+                        td.textContent = record[header]; 
+                        row.appendChild(td); 
+                    }); 
+                    tableBody.appendChild(row); 
+                } 
+            });
+
+            const firstCell = tableBody.querySelector('td');
+            if (firstCell) {
+                firstCell.setAttribute('tabindex', '0');
+            }
+            
+            const potentialItems = currentRecords;
+            const hasHiddenItemsInView = potentialItems.some(item => hiddenIdsForCurrentCategory.has(item[itemColumnName]));
+            if (hasHiddenItemsInView) {
+                const headerCell = document.getElementById('product-header-cell');
+                if (headerCell && !headerCell.querySelector('.unhide-btn')) {
+                    const headerContentWrapper = headerCell.querySelector('div');
+                    if (headerContentWrapper) {
+                        const showHiddenBtnIcon = document.createElement('button');
+                        showHiddenBtnIcon.title = 'แสดงแถวที่ซ่อน';
+                        showHiddenBtnIcon.className = 'unhide-btn text-gray-400 hover:text-yellow-600 focus:outline-none';
+                        showHiddenBtnIcon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z" /><path fill-rule="evenodd" d="M.458 10C3.732 4.943 9.523 3 15 3c5.478 0 11.268 1.943 14.542 7-3.274 5.057-9.064 7-14.542 7-5.477 0-11.268-1.943-14.542-7zM15 11a5 5 0 100-2 5 5 0 000 2z" clip-rule="evenodd" /></svg>`;
+                        showHiddenBtnIcon.onclick = () => { const itemsToUnhide = potentialItems.map(record => record[itemColumnName]).filter(id => hiddenIdsForCurrentCategory.has(id)); if (itemsToUnhide.length > 0) { unhideItems(itemsToUnhide); } };
+                        headerContentWrapper.appendChild(showHiddenBtnIcon);
+                    }
+                }
+            }
+
+            sortableInstance = new Sortable(tableBody, { animation: 150, ghostClass: 'sortable-ghost', chosenClass: 'sortable-chosen', delay: 200, touchStartThreshold: 5, onEnd: (evt) => { const newOrder = Array.from(tableBody.querySelectorAll('tr')).map(row => row.dataset.id); saveCurrentSortOrder(newOrder); } }); 
+        }
+        
+        function displayRequisitionList() {
+            requisitionListBody.innerHTML = '';
+            if (requisitionList.length === 0) { requisitionListBody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-gray-500">ไม่มีรายการที่ต้องเบิก</td></tr>'; confirmRequisitionBtn.disabled = true; return; }
+            confirmRequisitionBtn.disabled = false;
+            requisitionList.forEach((item, index) => { const row = document.createElement('tr'); row.innerHTML = `<td class="px-2 py-4 text-sm text-gray-600 text-center">${index + 1}</td><td class="px-2 py-4 text-sm text-gray-800 font-medium break-words">${item.name}</td><td class="px-2 py-4 text-sm text-gray-800 text-center">${item.quantity}</td><td class="px-2 py-4 text-sm text-gray-600 text-center">${item.unit}</td><td class="px-2 py-4 text-center text-sm font-medium"><button class="delete-req-btn text-red-600 hover:text-red-900" data-id="${item.id}">ลบ</button></td>`; requisitionListBody.appendChild(row); });
+        }
+        
+        function displayHistory() { 
+            historyListContainer.innerHTML = ''; 
+            if (historyList.length === 0) { historyListContainer.innerHTML = '<p class="text-center py-4 text-gray-500">ยังไม่มีประวัติการเบิก</p>'; return; } 
+            historyList.forEach(historyItem => { 
+                const date = historyItem.timestamp.toDate(); const formattedDate = `${date.toLocaleDateString('th-TH')} ${date.toLocaleTimeString('th-TH')}`; 
+                const card = document.createElement('div'); card.className = 'bg-gray-50 rounded-lg p-4 shadow'; 
+                const tableRows = historyItem.items.map((item, index) => `<tr><td class="py-2 px-2 text-sm text-gray-600 text-center">${index + 1}</td><td class="py-2 px-2 text-sm text-gray-800 break-words">${item.name}</td><td class="py-2 px-2 text-sm text-gray-800 text-center">${item.quantity}</td><td class="py-2 px-2 text-sm text-gray-600 text-center">${item.unit}</td></tr>`).join(''); 
+                
+                card.innerHTML = `<div class="flex justify-between items-center mb-3"><h3 class="font-semibold text-gray-800">${historyItem.requisitionNumber}</h3><span class="text-sm text-gray-500">${formattedDate}</span></div><div class="overflow-x-auto"><table class="w-full table-auto show-grid"><thead><tr><th scope="col" class="py-2 px-2 bg-gray-200 text-xs text-gray-600 font-medium text-center">ลำดับ</th><th scope="col" class="py-2 px-2 bg-gray-200 text-xs text-gray-600 font-medium text-left">สินค้า</th><th scope="col" class="py-2 px-2 bg-gray-200 text-xs text-gray-600 font-medium text-center">จำนวน</th><th scope="col" class="py-2 px-2 bg-gray-200 text-xs text-gray-600 font-medium text-center">หน่วย</th></tr></thead><tbody class="divide-y divide-gray-200">${tableRows}</tbody></table></div>`; 
+
+                historyListContainer.appendChild(card); 
+            });
+        }
+        
+        function openContextMenu(event, record) {
+            contextMenuItemRecord = record;
+            const { clientX: mouseX, clientY: mouseY } = event;
+            
+            itemContextMenu.style.top = `${mouseY}px`;
+            itemContextMenu.style.left = `${mouseX}px`;
+            itemContextMenu.classList.remove('hidden');
+
+            const menuRect = itemContextMenu.getBoundingClientRect();
+            if (menuRect.bottom > window.innerHeight) {
+                itemContextMenu.style.top = `${mouseY - menuRect.height}px`;
+            }
+            if (menuRect.right > window.innerWidth) {
+                itemContextMenu.style.left = `${mouseX - menuRect.width}px`;
+            }
+        }
+
+        function closeContextMenu() {
+            if (itemContextMenu && !itemContextMenu.classList.contains('hidden')) {
+                itemContextMenu.classList.add('hidden');
+                contextMenuItemRecord = null;
+            }
+        }
+
+        function openItemSettingsModal(record) { currentEditingItemId = record[itemColumnName]; const settings = itemSettings.get(currentEditingItemId) || {}; modalItemName.textContent = `ตั้งค่า: ${currentEditingItemId}`; reorderPointInput.value = settings.reorderPoint || ''; reorderQuantityInput.value = settings.reorderQuantity || ''; itemSettingsModal.classList.remove('hidden'); }
+        function closeItemSettingsModal() { itemSettingsModal.classList.add('hidden'); currentEditingItemId = null; }
+        function openCategoryActionsModal(category) { currentEditingCategory = category; categoryModalName.textContent = `จัดการหมวดหมู่: ${category.name}`; categoryActionsModal.classList.remove('hidden'); }
+        function closeCategoryActionsModal() { categoryActionsModal.classList.add('hidden'); currentEditingCategory = null; }
+        function openAddHeaderModal(referenceId = null) { insertHeaderAboveId = referenceId; headerInput.value = ''; addHeaderModal.classList.remove('hidden'); setTimeout(() => headerInput.focus(), 100); }
+        function closeAddHeaderModal() { addHeaderModal.classList.add('hidden'); insertHeaderAboveId = null; }
+        function openHeaderActionsModal(id, text) { currentEditingHeaderId = id; currentEditingHeaderText = text; headerModalName.textContent = `จัดการหัวข้อ: "${text}"`; headerActionsModal.classList.remove('hidden'); }
+        function closeHeaderActionsModal() { headerActionsModal.classList.add('hidden'); currentEditingHeaderId = null; currentEditingHeaderText = null; }
+        function showConfirmModal(title, body, onConfirm) { confirmModalTitle.textContent = title; confirmModalBody.textContent = body; confirmCallback = onConfirm; confirmModal.classList.remove('hidden'); }
+        function closeConfirmModal() { confirmModal.classList.add('hidden'); confirmCallback = null; }
+        function openAppSettingsModal() { updateAppSettingsModalInputs(); appSettingsModal.classList.remove('hidden'); }
+        function closeAppSettingsModal() { appSettingsModal.classList.add('hidden'); }
+        function updateAppSettingsModalInputs() { settingTriggerColInput.value = appSettings.triggerStockColumnName; settingCalcColInput.value = appSettings.calculationStockColumnName; settingUnitColInput.value = appSettings.unitColumnName; }
+        function showNotification(message, isError = true) { if (notificationTimeout) clearTimeout(notificationTimeout); notificationMessage.textContent = message; notificationToast.className = `fixed top-5 right-5 text-white py-3 px-5 rounded-lg shadow-lg z-50 transition-opacity duration-300 ${isError ? 'bg-red-500' : 'bg-green-500'}`; notificationToast.classList.remove('hidden', 'opacity-0'); notificationToast.classList.add('show'); notificationTimeout = setTimeout(() => { notificationToast.classList.remove('show'); notificationToast.classList.add('opacity-0'); setTimeout(() => notificationToast.classList.add('hidden'), 300); }, 4000); }
+        function switchView(viewName) { 
+            const views = { products: productListView, requisition: requisitionView, history: historyView, manage: manageView, account: accountView }; 
+            const navs = { products: navProductsBtn, requisition: navRequisitionBtn, history: navHistoryBtn, manage: navManageBtn, account: navAccountBtn }; 
+            Object.values(views).forEach(v => v.classList.add('hidden')); 
+            categoryNavView.classList.add('hidden');
+            Object.values(navs).forEach(n => { n.classList.remove('text-blue-600', 'border-blue-600'); n.classList.add('text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300', 'border-transparent'); }); 
+            views[viewName].classList.remove('hidden'); 
+            navs[viewName].classList.add('text-blue-600', 'border-blue-600'); 
+            navs[viewName].classList.remove('text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300', 'border-transparent');
+            if (viewName === 'products') { categoryNavView.classList.remove('hidden'); }
+        }
+        function showError(message) { errorMessageEl.textContent = `เกิดข้อผิดพลาด: ${message}`; errorEl.classList.remove('hidden'); }
+        function showNoData() { noDataEl.querySelector('p').textContent = 'ไม่พบข้อมูล'; noDataEl.classList.remove('hidden'); tableEl.classList.add('hidden'); }
+        
+        categoryList.addEventListener('wheel', (event) => { if (window.matchMedia('(pointer: fine)').matches) { event.preventDefault(); categoryList.scrollLeft += event.deltaY; } }, { passive: false });
+        addCategoryBtn.addEventListener('click', addCategory); 
+        categoryInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') addCategory(); });
+        navProductsBtn.addEventListener('click', () => switchView('products'));
+        navRequisitionBtn.addEventListener('click', () => switchView('requisition'));
+        navHistoryBtn.addEventListener('click', () => switchView('history'));
+        navManageBtn.addEventListener('click', () => switchView('manage'));
+        navAccountBtn.addEventListener('click', () => switchView('account'));
+        modalOkBtn.addEventListener('click', saveItemSettings);
+        modalCancelBtn.addEventListener('click', closeItemSettingsModal);
+        editCategoryBtn.addEventListener('click', () => { if (currentEditingCategory) { editCategory(currentEditingCategory.id, currentEditingCategory.name); closeCategoryActionsModal(); } });
+        deleteCategoryBtn.addEventListener('click', () => { if (currentEditingCategory) { showConfirmModal('ยืนยันการลบ', `ต้องการลบหมวดหมู่ "${currentEditingCategory.name}" หรือไม่?`, () => { deleteCategory(currentEditingCategory.id); closeCategoryActionsModal(); }); } });
+        categoryModalCancelBtn.addEventListener('click', closeCategoryActionsModal);
+        categoryActionsModal.addEventListener('click', (e) => { if (e.target === categoryActionsModal) { closeCategoryActionsModal(); } });
+        headerModalOkBtn.addEventListener('click', async () => { const headerText = headerInput.value.trim(); if (headerText) { await addHeaderRow(headerText); closeAddHeaderModal(); } });
+        headerModalCancelBtn.addEventListener('click', closeAddHeaderModal);
+        headerInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { const headerText = headerInput.value.trim(); if (headerText) { addHeaderRow(headerText); closeAddHeaderModal(); } } });
+        addHeaderModal.addEventListener('click', (e) => { if (e.target === addHeaderModal) { closeAddHeaderModal(); } });
+        editHeaderBtn.addEventListener('click', () => { if(currentEditingHeaderId) { editHeaderRow(currentEditingHeaderId, currentEditingHeaderText); closeHeaderActionsModal(); } });
+        deleteHeaderBtn.addEventListener('click', () => { if(currentEditingHeaderId) { showConfirmModal('ยืนยันการลบ', `ต้องการลบหัวข้อ "${currentEditingHeaderText}" หรือไม่?`, () => { deleteHeaderRow(currentEditingHeaderId); closeHeaderActionsModal(); }); } });
+        headerActionsCancelBtn.addEventListener('click', closeHeaderActionsModal);
+        headerActionsModal.addEventListener('click', (e) => { if (e.target === headerActionsModal) { closeHeaderActionsModal(); }});
+        confirmModalOkBtn.addEventListener('click', () => { if (typeof confirmCallback === 'function') { confirmCallback(); } closeConfirmModal(); });
+        confirmModalCancelBtn.addEventListener('click', closeConfirmModal);
+        appSettingsBtn.addEventListener('click', openAppSettingsModal);
+        appSettingsSaveBtn.addEventListener('click', saveAppSettings);
+        appSettingsCancelBtn.addEventListener('click', closeAppSettingsModal);
+        autoRequisitionBtn.addEventListener('click', generateRequisition);
+        requisitionListBody.addEventListener('click', (e) => { if(e.target.classList.contains('delete-req-btn')) { deleteRequisitionItem(e.target.dataset.id); }});
+        confirmRequisitionBtn.addEventListener('click', confirmRequisition);
+
+        window.addEventListener('click', (e) => {
+            if (itemContextMenu && !itemContextMenu.classList.contains('hidden')) {
+                if (!itemContextMenu.contains(e.target)) {
+                    closeContextMenu();
+                }
+            }
+        });
+        window.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeContextMenu(); });
+
+        contextMenuSettingsBtn.addEventListener('click', () => {
+            if (contextMenuItemRecord) openItemSettingsModal(contextMenuItemRecord);
+            closeContextMenu();
+        });
+
+        contextMenuHideBtn.addEventListener('click', () => {
+            if (contextMenuItemRecord && itemColumnName) {
+                const itemId = contextMenuItemRecord[itemColumnName];
+                hideItem(itemId);
+            }
+            closeContextMenu();
+        });
+        
+        contextMenuAddHeaderBtn.addEventListener('click', () => {
+            if (contextMenuItemRecord && itemColumnName) {
+                const itemId = contextMenuItemRecord[itemColumnName];
+                openAddHeaderModal(itemId);
+            }
+            closeContextMenu();
+        });
+
+        function handleKeyNavigation(e) {
+            if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                return;
+            }
+
+            const activeElement = document.activeElement;
+            const isWithinGrid = activeElement.tagName === 'TD' && activeElement.closest('#data-table tbody');
+
+            if (isWithinGrid) {
+                e.preventDefault();
+                const tableBody = activeElement.closest('tbody');
+                const grid = Array.from(tableBody.querySelectorAll('tr')).map(r => Array.from(r.querySelectorAll('td')));
+                
+                let currentRowIndex = -1, currentCellIndex = -1;
+                for (let i = 0; i < grid.length; i++) {
+                    let foundIndex = grid[i].indexOf(activeElement);
+                    if (foundIndex !== -1) {
+                        currentRowIndex = i;
+                        currentCellIndex = foundIndex;
+                        break;
+                    }
+                }
+
+                if (currentRowIndex === -1) return;
+
+                if (grid[currentRowIndex].length > 1) {
+                    lastGoodCellIndex = currentCellIndex;
+                }
+
+                let nextRowIndex = currentRowIndex;
+                let nextCellIndex = currentCellIndex;
+
+                switch (e.key) {
+                    case 'ArrowUp':
+                        nextRowIndex = Math.max(0, currentRowIndex - 1);
+                        nextCellIndex = lastGoodCellIndex;
+                        break;
+                    case 'ArrowDown':
+                        nextRowIndex = Math.min(grid.length - 1, currentRowIndex + 1);
+                        nextCellIndex = lastGoodCellIndex;
+                        break;
+                    case 'ArrowLeft':
+                        nextCellIndex = Math.max(0, currentCellIndex - 1);
+                        break;
+                    case 'ArrowRight':
+                        nextCellIndex = Math.min(grid[currentRowIndex].length - 1, currentCellIndex + 1);
+                        break;
+                }
+                
+                const targetRow = grid[nextRowIndex];
+                if (!targetRow) return;
+
+                const clampedCellIndex = Math.min(nextCellIndex, targetRow.length - 1);
+                const targetCell = targetRow[clampedCellIndex];
+                
+                if (targetCell) {
+                    activeElement.setAttribute('tabindex', '-1');
+                    targetCell.setAttribute('tabindex', '0');
+                    targetCell.focus();
+                }
+                return;
+            }
+
+            if ((activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA') && ['ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                return;
+            }
+            e.preventDefault();
+            const focusableSelector = 'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+            const allFocusable = Array.from(document.querySelectorAll(focusableSelector))
+                                       .filter(el => el.offsetParent !== null && !el.closest('.hidden'));
+            if (allFocusable.length === 0) return;
+            
+            let currentIndex = allFocusable.indexOf(activeElement);
+            let nextIndex = 0;
+
+            if (currentIndex === -1) {
+                 nextIndex = 0;
+            } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+                nextIndex = currentIndex > 0 ? currentIndex - 1 : allFocusable.length - 1;
+            } else { 
+                nextIndex = currentIndex < allFocusable.length - 1 ? currentIndex + 1 : 0;
+            }
+            
+            allFocusable[nextIndex]?.focus();
+        }
+
+        document.addEventListener('keydown', handleKeyNavigation);
+
+        const navWrapper = document.getElementById('nav-toggle-wrapper'), navTrigger = document.getElementById('nav-trigger'), navIcon = document.getElementById('nav-trigger-icon');
+        let isNavOpen = false;
+        const openNav = () => { if (isNavOpen) return; isNavOpen = true; navWrapper.classList.remove('h-4'); navWrapper.classList.add('h-16'); navIcon.classList.add('rotate-180'); };
+        const closeNav = () => { if (!isNavOpen) return; isNavOpen = false; navWrapper.classList.remove('h-16'); navWrapper.classList.add('h-4'); navIcon.classList.remove('rotate-180'); };
+        if (window.matchMedia('(pointer: fine)').matches) { navWrapper.addEventListener('mouseenter', openNav); navWrapper.addEventListener('mouseleave', closeNav); } 
+        else { navTrigger.addEventListener('click', () => isNavOpen ? closeNav() : openNav()); }
+    });
+</script>
+
+</body>
+</html>
